@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const syncRoutes = require('./routes/sync.route');
+const schemaRoutes = require('./routes/schema.route');
 const { closeAllPools } = require('./config/sqlServerPool');
 
 const app = express();
@@ -9,6 +10,7 @@ app.use(express.json());
 app.get('/health', (_req, res) => res.status(200).send('OK'));
 
 app.use('/sync', syncRoutes);
+app.use('/schema', schemaRoutes);
 
 const PORT = process.env.PORT || 8080;
 const server = app.listen(PORT, () => {

@@ -5,7 +5,7 @@ const ITEM_GROUPS_QUERY = `
   SELECT
       code          = ISNULL(NULLIF(A.KLASIF2,''),'PA GRUPIM')
     , description   = MIN(C.PERSHKRIM)
-    , modifiedDate   = MAX(C.DATEEDIT)
+    , modifiedDate  = MAX(C.DATEEDIT)
   FROM ARTIKUJ A
   LEFT JOIN ARTIKUJKLS2 C
     ON A.KLASIF2 = C.KOD
