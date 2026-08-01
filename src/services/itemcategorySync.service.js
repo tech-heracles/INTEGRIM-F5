@@ -4,26 +4,66 @@ const { getPoolForCompany, sql } = require('../config/sqlServerPool');
 const ITEM_CATEGORIES_QUERY = `
   SELECT
       code          = ISNULL(NULLIF(A.KLASIF,''), 'PA KATEGORI')
-    , description   = ISNULL(MAX(C.PERSHKRIM),'')
+    , description   = ISNULL(MAX(C.PERSHKRIM), '')
     , modifiedDate  = MAX(A.DATEEDIT)
     , groupCode     = ISNULL(NULLIF(A.KLASIF2,''),'PA GRUPIM')
-    , printer       = ISNULL(A.KLASIF3,'')
+    , printer       = ISNULL(MAX(A.KLASIF3), '')
   FROM ARTIKUJ A
   LEFT JOIN ARTIKUJKLS1 C
     ON A.KLASIF = C.KOD
-
     
   WHERE A.DATEEDIT >= @lastSync
   GROUP BY
       ISNULL(NULLIF(A.KLASIF,''), 'PA KATEGORI')
     , ISNULL(NULLIF(A.KLASIF2,''),'PA GRUPIM')
-    , ISNULL(A.KLASIF3,'')
 `;
 
 const FULL_ITEM_CATEGORIES_QUERY = ITEM_CATEGORIES_QUERY.replace(
   'WHERE A.DATEEDIT >= @lastSync',
   ''
 );
+
+// Query-i grupon nga (KLASIF, KLASIF2), keshtu qe nje kategori qe ka artikuj
+// ne 2 grupe te ndryshme kthehet si 2 rreshta me te njejtin "code" por
+// "groupCode" te ndryshem. Meqe dokumenti ne Firestore identifikohet vetem
+// nga "code", pa i bashkuar keta rreshta ketu, rreshti i dyte thjesht do
+// mbishkruante te parin (do humbiste grupin e pare). Kjo funksion i bashkon
+// rreshtat per te njejtin "code" ne nje dokument te vetem, me "groupCodes"
+// si array.
+function consolidateItemCategories(rows) {
+  const byCode = new Map();
+
+  for (const row of rows) {
+    const existing = byCode.get(row.code);
+
+    if (!existing) {
+      byCode.set(row.code, {
+        code: row.code,
+        description: row.description,
+        printer: row.printer,
+        modifiedDate: row.modifiedDate,
+        groupCodes: [row.groupCode],
+      });
+      continue;
+    }
+
+    if (!existing.groupCodes.includes(row.groupCode)) {
+      existing.groupCodes.push(row.groupCode);
+    }
+
+    // description/printer vijne nga i njejti "code", keshtu qe duhet te jene
+    // identike per te gjithe rreshtat me te njejtin "code" - por e mbrojme
+    // rastin kur njeri rresht ka vlere e tjetri jo.
+    if (!existing.description && row.description) existing.description = row.description;
+    if (!existing.printer && row.printer) existing.printer = row.printer;
+
+    if (row.modifiedDate && (!existing.modifiedDate || row.modifiedDate > existing.modifiedDate)) {
+      existing.modifiedDate = row.modifiedDate;
+    }
+  }
+
+  return Array.from(byCode.values());
+}
 
 const FIRESTORE_BATCH_LIMIT = 500;
 
@@ -110,7 +150,9 @@ async function syncItemCategories(companyId, fullSync = false) {
     return { companyId, synced: 0, fullSync, message: 'Nuk ka te dhena te reja per sync.' };
   }
 
-  const written = await upsertItemCategoriesToFirestore(companyId, itemCategories);
+  const consolidated = consolidateItemCategories(itemCategories);
+
+  const written = await upsertItemCategoriesToFirestore(companyId, consolidated);
   await setLastSyncTime(companyId, 'ITEM_CATEGORY', syncStartedAt);
 
   return { companyId, synced: written, fullSync };
