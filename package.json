@@ -1,0 +1,27 @@
+{
+  "name": "integrim-f5",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tech-heracles/INTEGRIM-F5.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tech-heracles/INTEGRIM-F5/issues"
+  },
+  "homepage": "https://github.com/tech-heracles/INTEGRIM-F5#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "firebase-admin": "^14.2.0",
+    "mssql": "^12.7.0"
+  }
+}
