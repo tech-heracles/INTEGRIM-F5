@@ -14,7 +14,7 @@ async function getErpConfig(companyId) {
 
   if (!snap.exists) {
     throw new Error(
-      `Nuk u gjet konfigurimi ERP per companyId="${companyId}" ne companies/${companyId}/FINANCA/${FINANCA_DOC_ID}`
+      `Nuk u gjet konfigurimi ERP per companyId="${companyId}" ne companies/${companyId}/${FINANCA_COLLECTION}/${FINANCA_DOC_ID}`
     );
   }
 
@@ -22,19 +22,29 @@ async function getErpConfig(companyId) {
 
   if (!data.server || !data.database || !data.user || !data.password) {
     throw new Error(
-      `Config i pamjaftueshem ne FINANCA per companyId="${companyId}". Duhen: server, database, user, password.`
+      `Config i pamjaftueshem ne ${FINANCA_COLLECTION} per companyId="${companyId}". Duhen: server, database, user, password.`
     );
   }
 
-  return {
-    server: data.server,
-    port: data.port || 1433,
+  // Trajto format "server\instanceName" (p.sh. ".\HERACLES" ose "SERVERNAME\HERACLES")
+  let serverHost = data.server;
+  let instanceName;
+
+  if (data.server.includes('\\')) {
+    const parts = data.server.split('\\');
+    serverHost = parts[0] === '' || parts[0] === '.' ? 'localhost' : parts[0];
+    instanceName = parts[1];
+  }
+
+  const config = {
+    server: serverHost,
     database: data.database,
     user: data.user,
     password: data.password,
     options: {
       encrypt: data.encrypt ?? false,
       trustServerCertificate: data.trustServerCertificate ?? true,
+      ...(instanceName ? { instanceName } : {}),
     },
     pool: {
       max: 10,
@@ -42,6 +52,13 @@ async function getErpConfig(companyId) {
       idleTimeoutMillis: 30000,
     },
   };
+
+  // Port perdoret vetem nese s'ka instanceName (instanca e emeruar e gjen porten vete via SQL Browser)
+  if (!instanceName && data.port) {
+    config.port = data.port;
+  }
+
+  return config;
 }
 
 module.exports = { getErpConfig };

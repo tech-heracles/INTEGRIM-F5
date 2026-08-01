@@ -2,22 +2,39 @@ const { db } = require('../config/firestore');
 const { getPoolForCompany, sql } = require('../config/sqlServerPool');
 
 const ITEMS_QUERY = `
-  SELECT
-    ItemCode      AS itemCode,
-    ItemName      AS name,
-    Barcode       AS barcode,
-    SalePrice     AS price,
-    Unit          AS unit,
-    Category      AS category,
-    StockQty      AS stock,
-    Active        AS active,
-    ModifiedDate  AS modifiedDate
-  FROM dbo.Items
-  WHERE ModifiedDate >= @lastSync
+SELECT
+        ItemCode                  = ISNULL(UPPER(LTRIM(RTRIM(A.KOD))), '')
+      , Description               = ISNULL(A.PERSHKRIM, '')
+      , LongDescription           = ISNULL(A.PERSHKRIM, '')
+      , BaseUOM                   = ISNULL(A.NJESSH, '')
+      , VAT                       = ISNULL(TVSH.PERQINDJE, 20)
+      , CategoryCode              = ISNULL(NULLIF(A.KLASIF,''), 'PA KATEGORI')
+      , GroupCode                 = ISNULL(NULLIF(A.KLASIF2,''),'PA GRUPIM')
+      , BasePrice                 = A.CMSH
+      , ItemType                  = N'Inventar'
+      , ExemptFromVAT             = N''
+      , Active                    = ISNULL(~A.NOTACTIV,1)
+      , ModifiedDate              = A.DATEEDIT
+      , BaseBarcode               = A.BC
+      , Barcodes = JSON_QUERY((
+          SELECT '[' + STRING_AGG(
+                     '"' + STRING_ESCAPE(UPPER(LTRIM(RTRIM(scr.BC))), 'json') + '"'
+                     , ','
+                   ) + ']'
+          FROM draft_financa5_v2.dbo.ARTIKUJBCSCR scr
+          WHERE scr.NRD = A.NRRENDOR
+            AND LTRIM(RTRIM(ISNULL(scr.BC, ''))) <> ''
+      ))
+FROM    dbo.ARTIKUJ           A
+    LEFT JOIN dbo.KLASATATIM   TVSH
+        ON A.KODTVSH = TVSH.KOD
+
+        
+WHERE A.DATEEDIT >= @lastSync
 `;
 
 const FULL_ITEMS_QUERY = ITEMS_QUERY.replace(
-  'WHERE ModifiedDate >= @lastSync',
+  'WHERE A.DATEEDIT >= @lastSync',
   ''
 );
 
@@ -31,24 +48,39 @@ function chunkArray(arr, size) {
   return chunks;
 }
 
+function sanitizeDocId(rawCode) {
+  return String(rawCode)
+    .trim()
+    .replace(/\//g, '_'); // zevendeso '/' me '_'
+}
+
 async function upsertItemsToFirestore(companyId, items) {
   const itemsCollection = db
     .collection('companies')
     .doc(companyId)
     .collection('ITEM');
 
-  const chunks = chunkArray(items, FIRESTORE_BATCH_LIMIT);
+  const validItems = items.filter((item) => item.Code && item.Code.trim() !== '');
+  const skipped = items.length - validItems.length;
+
+  if (skipped > 0) {
+    console.warn(`[Sync Warning] ${skipped} rreshta u anashkaluan (Code bosh/i pavlefshem).`);
+  }
+
+  const chunks = chunkArray(validItems, FIRESTORE_BATCH_LIMIT);
   let written = 0;
 
   for (const chunk of chunks) {
     const batch = db.batch();
 
     for (const item of chunk) {
-      const docRef = itemsCollection.doc(String(item.itemCode));
+      const docId = sanitizeDocId(item.Code);
+      const docRef = itemsCollection.doc(docId);
       batch.set(
         docRef,
         {
           ...item,
+          originalCode: item.Code, // ruajme kodin origjinal te pastruar per referim
           syncedAt: new Date(),
         },
         { merge: true }
