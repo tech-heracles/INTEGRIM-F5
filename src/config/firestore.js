@@ -1,14 +1,20 @@
-const admin = require('firebase-admin');
+const path = require('path');
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    // credential: admin.credential.applicationDefault(), // default, nuk duhet e shkruar
+let app;
+
+if (!getApps().length) {
+  const serviceAccount = require(path.join(__dirname, '..', '..', 'serviceAccountKey.json'));
+
+  app = initializeApp({
+    credential: cert(serviceAccount),
   });
+} else {
+  app = getApps()[0];
 }
 
-const db = admin.firestore();
-
-// Rekomandim performance: settings për cache/undefined properties
+const db = getFirestore(app);
 db.settings({ ignoreUndefinedProperties: true });
 
-module.exports = { admin, db };
+module.exports = { db };

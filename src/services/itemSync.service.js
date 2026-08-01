@@ -1,10 +1,6 @@
 const { db } = require('../config/firestore');
 const { getPoolForCompany, sql } = require('../config/sqlServerPool');
 
-/**
- * PERSHTATJE E DETYRUESHME:
- * Query-n me poshte duhet ta pershtatesh me skemen reale te ERP-se se klientit.
- */
 const ITEMS_QUERY = `
   SELECT
     ItemCode      AS itemCode,
