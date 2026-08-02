@@ -1,28 +1,43 @@
 const { db } = require('../config/firestore');
 
-const FINANCA_COLLECTION = 'finance';
-const FINANCA_DOC_ID = 'f5'; // emer fiks i dokumentit te config-ut
-
 async function getErpConfig(companyId) {
-  const docRef = db
-    .collection('companies')
-    .doc(companyId)
-    .collection(FINANCA_COLLECTION)
-    .doc(FINANCA_DOC_ID);
+  const companyRef = db.collection('companies').doc(companyId);
+  const companySnap = await companyRef.get();
 
-  const snap = await docRef.get();
+  if (!companySnap.exists) {
+    throw new Error(`Nuk u gjet kompania per companyId="${companyId}".`);
+  }
 
-  if (!snap.exists) {
+  const activeErpType = companySnap.data().activeErpType;
+
+  if (!activeErpType) {
     throw new Error(
-      `Nuk u gjet konfigurimi ERP per companyId="${companyId}" ne companies/${companyId}/${FINANCA_COLLECTION}/${FINANCA_DOC_ID}`
+      `Kompania companyId="${companyId}" nuk ka nje integrim ERP aktiv (fusha "activeErpType" mungon).`
     );
   }
 
-  const data = snap.data();
+  if (activeErpType !== 'financa5') {
+    throw new Error(
+      `Integrimi "${activeErpType}" nuk eshte akoma i mbeshtetur nga POS Sync Service (vetem "financa5" per momentin).`
+    );
+  }
+
+  const integrationSnap = await companyRef
+    .collection('erpIntegrations')
+    .doc(activeErpType)
+    .get();
+
+  if (!integrationSnap.exists) {
+    throw new Error(
+      `Nuk u gjet konfigurimi ne companies/${companyId}/erpIntegrations/${activeErpType}.`
+    );
+  }
+
+  const data = integrationSnap.data().config || {};
 
   if (!data.server || !data.database || !data.user || !data.password) {
     throw new Error(
-      `Config i pamjaftueshem ne ${FINANCA_COLLECTION} per companyId="${companyId}". Duhen: server, database, user, password.`
+      `Config i pamjaftueshem per integrimin "${activeErpType}" per companyId="${companyId}". Duhen: server, database, user, password.`
     );
   }
 
@@ -53,7 +68,6 @@ async function getErpConfig(companyId) {
     },
   };
 
-  // Port perdoret vetem nese s'ka instanceName (instanca e emeruar e gjen porten vete via SQL Browser)
   if (!instanceName && data.port) {
     config.port = data.port;
   }

@@ -3,7 +3,7 @@ const { getPoolForCompany, sql } = require('../config/sqlServerPool');
 
 const ITEMS_QUERY = `
 SELECT
-        Code                  = ISNULL(UPPER(LTRIM(RTRIM(A.KOD))), '')
+        Code                      = ISNULL(UPPER(LTRIM(RTRIM(A.KOD))), '')
       , Description               = ISNULL(A.PERSHKRIM, '')
       , LongDescription           = ISNULL(A.PERSHKRIM, '')
       , BaseUOM                   = ISNULL(A.NJESSH, '')
