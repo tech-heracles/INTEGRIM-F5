@@ -21,9 +21,30 @@ SELECT
                      '"' + STRING_ESCAPE(UPPER(LTRIM(RTRIM(scr.BC))), 'json') + '"'
                      , ','
                    ) + ']'
-          FROM draft_financa5_v2.dbo.ARTIKUJBCSCR scr
+          FROM dbo.ARTIKUJBCSCR scr
           WHERE scr.NRD = A.NRRENDOR
             AND LTRIM(RTRIM(ISNULL(scr.BC, ''))) <> ''
+      ))
+      , SalesPrices = JSON_QUERY((
+          SELECT '[' + STRING_AGG(
+                     '{"priceLevel":"' + STRING_ESCAPE(sp.priceLevel, 'json') + '","value":' + CAST(sp.Price AS NVARCHAR(50)) + '}'
+                     , ','
+                   ) + ']'
+          FROM (
+              SELECT 'A', A.CMSH  UNION ALL
+              SELECT 'B', A.CMSH1 UNION ALL
+              SELECT 'C', A.CMSH2 UNION ALL
+              SELECT 'D', A.CMSH3 UNION ALL
+              SELECT 'E', A.CMSH4 UNION ALL
+              SELECT 'F', A.CMSH5 UNION ALL
+              SELECT 'G', A.CMSH6 UNION ALL
+              SELECT 'H', A.CMSH7 UNION ALL
+              SELECT 'I', A.CMSH8 UNION ALL
+              SELECT 'J', A.CMSH9
+          ) sp(priceLevel, Price)
+          WHERE sp.Price IS NOT NULL
+            AND sp.Price > 0
+            AND EXISTS (SELECT 1 FROM dbo.KLIENT K WHERE K.GRUP = sp.priceLevel)
       ))
 FROM    dbo.ARTIKUJ           A
     LEFT JOIN dbo.KLASATATIM   TVSH
