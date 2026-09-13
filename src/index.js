@@ -6,6 +6,18 @@ const erpRoutes = require('./routes/erp.route');
 const { closeAllPools } = require('./config/sqlServerPool');
 
 const app = express();
+
+// Manager app calls this service from a browser (Flutter web) on a
+// different origin/port, so the CORS preflight (OPTIONS) needs a response
+// before express.json() even sees the real request.
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.status(200).send('OK'));
